@@ -28,7 +28,11 @@ async fn main() {
 
     
     let app = Router::new()
-        .route("/health", get(|| async { "ok" }));
+        .route("/health", get(|| async { "ok" }))
+        .merge(routes::auth::router()).with_state(state::state::AppState {
+            db: _pool,
+            jwt_secret: env::var("JWT_SECRET").unwrap_or("my-secret-key".to_string()),
+        });
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
