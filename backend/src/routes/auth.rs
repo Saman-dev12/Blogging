@@ -1,5 +1,5 @@
 use crate::state::{authdata::{LoginPayload, RegisterPayload}, state::AppState};
-use axum::{extract::{Json, State}, middleware, response::IntoResponse};
+use axum::{extract::{Json, State}, response::IntoResponse};
 use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use argon2::password_hash::{SaltString,rand_core::OsRng};
 use serde_json::json;

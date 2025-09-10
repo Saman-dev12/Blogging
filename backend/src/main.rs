@@ -1,10 +1,13 @@
-use axum::{Router, routing::get};
+use axum::{middleware::from_fn_with_state, Router, routing::get};
 use std::net::SocketAddr;
 use tracing_subscriber;
 use dotenv::dotenv;
 use std::env;
 use sqlx::postgres::PgPoolOptions;
+use tower::ServiceBuilder;
+use tower_http::cors::CorsLayer;
 
+mod middleware;
 mod routes;
 mod state;
 
@@ -27,16 +30,30 @@ async fn main() {
         .expect("Failed to connect to database");
 
     
+    let app_state = state::state::AppState {
+        db: _pool,
+        jwt_secret: env::var("JWT_SECRET").unwrap_or("my-secret-key".to_string()),
+    };
+
+    // Configure CORS - allow all origins for development
+    let cors = CorsLayer::very_permissive();
+
     let app = Router::new()
         .route("/health", get(|| async { "ok" }))
-        .merge(routes::auth::router()).with_state(state::state::AppState {
-            db: _pool,
-            jwt_secret: env::var("JWT_SECRET").unwrap_or("my-secret-key".to_string()),
-        });
+        .nest("/", routes::auth::router())
+        .nest("/api", 
+            routes::blogs::router()
+                .layer(from_fn_with_state(
+                    app_state.clone(),
+                    crate::middleware::auth_middleware
+                ))
+        )
+        .layer(ServiceBuilder::new().layer(cors))
+        .with_state(app_state);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    tracing::info!("🚀 Server running on http://{}", addr);
+    tracing::info!("🚀 Server running on http://0.0.0.0:3000");
 
     axum::serve(listener, app).await.unwrap();
 }
